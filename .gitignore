@@ -1,0 +1,4 @@
+*.exe
+tests/devlib.nim
+tests/devmain.nim
+tests/test1.exe

@@ -5,28 +5,25 @@
 #
 # To run these tests, simply execute `nimble test`.
 
-import unittest
-
+import unittest, tables
 import simple_inject
 
-test "can add":
-  check `+`(5, 5) == 10
 
-var global_var* = 1
+var global_var* = initTable[string, bool]()
 
-proc change_global =
-  global_var = 2
 
-proc basic_proc {.inj.} =
+proc simple_change_global =
+  global_var["simple"] = true
+
+proc simple_main {.inj.} =
   discard 1 + 1
 
-test "Correct starting values":
-  check global_var == 1
-
-test "Global variable changes when it should":
-  basic_proc()
-  check global_var == 1
-  set_inj("basic_proc", change_global)
-  check global_var == 1
-  basic_proc()
-  check global_var == 2
+test "simple version works properly":
+  global_var["simple"] = false
+  check not global_var["simple"]  # value starts correctly
+  simple_main()
+  check not global_var["simple"]  # Nothing changes when it's not meant to
+  set_inj("simple_main", simple_change_global)  # proc to check for in string, proc to call
+  check not global_var["simple"]  # Change instructions, but don't modify anything
+  simple_main()
+  check global_var["simple"]  # Global changes now after detecting to add call
