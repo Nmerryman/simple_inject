@@ -58,7 +58,6 @@ macro inj_with_args*(x: typed): untyped =
     let parameters = x[3].copy
     for a in 1 ..< parameters.len:
         for b in 0 ..< (parameters[a].len - 2):
-            # echo result.treeRepr
             result[6][^appended][^1][^1][^1].add(parameters[a][b])  # very ugly manual traversal, but it should work because I'm traversing my consistent addition
     
     # Convert all found args to ptr
@@ -70,9 +69,7 @@ macro inj_with_args*(x: typed): untyped =
     for a in  1 ..< result[6][^appended][^1][^1][^1].len:
         result[6][^appended][^1][^1][^1][a] = newTree(nnkCall, bindsym("pointer"), result[6][^appended][^1][^1][^1][a])
 
-        
-    # echo result.treeRepr
-    # return x
+
 
 
 proc set_inj*(base: string, callable: proc ()) =

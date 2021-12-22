@@ -1,6 +1,16 @@
 This is to fix an issues I had with another project of mine and a feature I was trying (but probably failing) to ask about.
 
+TODO:
+clean up code
+add an easier dereferencer (consider wargs)
+add tests
+add the last version which allows the injection proc to take in current extra arguments
+
+
 annoyances:
 needing to know about how the backticks work
 needed to export tables because the other file doesn't know about .[]
 ptr and pointer are different
+
+questions:
+is cast[ptr A] and cast[ref A] the same

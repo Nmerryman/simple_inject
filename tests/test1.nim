@@ -27,3 +27,23 @@ test "simple version works properly":
   check not global_var["simple"]  # Change instructions, but don't modify anything
   simple_main()
   check global_var["simple"]  # Global changes now after detecting to add call
+
+
+proc arg_change_global(args: varargs[pointer]) =
+  if cast[ptr bool](args[0])[]:  # knowing what data type the first pointer is supposed to be
+    global_var["arg"] = true
+
+
+proc arg_main(do_change: bool = false) {.inj_with_args.} =
+  discard not do_change
+
+
+test "passing basic args works properly":
+  global_var["arg"] = false
+  check not global_var["arg"]  # value starts correctly
+  arg_main(true)
+  check not global_var["arg"]  # Nothing changes when it's not meant to
+  set_inj("arg_main", arg_change_global)  # proc to check for in string, proc to call
+  check not global_var["arg"]  # Change instructions, but don't modify anything
+  arg_main(true)
+  check global_var["arg"]  # Global changes now after detecting to add call
