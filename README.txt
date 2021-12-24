@@ -2,7 +2,7 @@ This is to fix an issues I had with another project of mine and a feature I was 
 
 TODO:
 clean up code
-add an easier dereferencer (consider wargs)
+add an easier dereferencer/better encapsulation (consider wargs)
 add tests
 add the last version which allows the injection proc to take in current extra arguments  (I have decide to forgo this because I can just more easily implimentit in my callback)
 
