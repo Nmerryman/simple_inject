@@ -47,3 +47,11 @@ test "passing basic args works properly":
   check not global_var["arg"]  # Change instructions, but don't modify anything
   arg_main(true)
   check global_var["arg"]  # Global changes now after detecting to add call
+
+  global_var["arg"] = false  # test disabler
+  check not global_var["arg"]
+  call_normal:  # doesn't do any injections
+    arg_main(true)
+  check not global_var["arg"]
+  arg_main(true)
+  check global_var["arg"]

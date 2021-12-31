@@ -3,6 +3,7 @@ export tables
 
 var simple_str_to_proc* = initTable[string, proc ()]()
 var arg_str_to_proc* = initTable[string, proc(T: varargs[pointer])]()
+var enabled_proc_inj* = true  # TODO global rn, want to make it proc specific later
 
 # type wargs
 
@@ -17,7 +18,7 @@ macro inj*(x: typed): typed =
     var modify = x[^1].copy
     let operation = block:  # Node I want to inject
         quote do:
-            if simple_str_to_proc.hasKey(`proc_name`):
+            if simple_str_to_proc.hasKey(`proc_name`) and enabled_proc_inj:
                 let runable = simple_str_to_proc[`proc_name`]
                 runable()
     
@@ -38,7 +39,7 @@ macro inj_with_args*(x: typed): untyped =
     var modify = x[6].copy
     let operation = block:  # Node I want to inject
         quote do:
-            if arg_str_to_proc.hasKey(`proc_name`):
+            if arg_str_to_proc.hasKey(`proc_name`) and enabled_proc_inj:
                 discard
                 arg_str_to_proc[`proc_name`]()  # the modify is temporary to avoid an issue
     var appended = 1  # Because sometimes more things get appended to the end (such as result)
@@ -69,6 +70,12 @@ macro inj_with_args*(x: typed): untyped =
     for a in  1 ..< result[6][^appended][^1][^1][^1].len:
         result[6][^appended][^1][^1][^1][a] = newTree(nnkCall, bindsym("pointer"), result[6][^appended][^1][^1][^1][a])
 
+
+macro call_normal*(x: untyped): untyped =
+    quote do:
+        enabled_proc_inj = false
+        `x`
+        enabled_proc_inj = true
 
 
 
