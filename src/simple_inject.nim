@@ -6,13 +6,13 @@ var arg_str_to_proc* = initTable[string, proc(T: varargs[pointer])]()
 var enabled_proc_inj* = true  # TODO global rn, want to make it proc specific later
 type inj_location* = enum
     before, after
-type inj_actions_container* = object
+type inj_actions_container* = ref object
     where*: inj_location
     pass_args*: bool
     run_proc*: bool
     active*: bool
 
-var inj_actions* = inj_actions_container()  # TODO change this back to ref
+var inj_actions* = new inj_actions_container
 
 # type wargs
 
