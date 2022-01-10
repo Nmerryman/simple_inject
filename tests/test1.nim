@@ -33,10 +33,8 @@ proc arg_change_global(args: varargs[pointer]) =
   if cast[ptr bool](args[0])[]:  # knowing what data type the first pointer is supposed to be
     global_var["arg"] = true
 
-
 proc arg_main(do_change: bool = false) {.inj_with_args.} =
   discard not do_change
-
 
 test "passing basic args works properly":
   global_var["arg"] = false
@@ -55,3 +53,52 @@ test "passing basic args works properly":
   check not global_var["arg"]
   arg_main(true)
   check global_var["arg"]
+
+
+proc catch_in {.watch.} =
+  # This will only run when run main is called
+  global_var["catch"] = false
+
+proc catch_basic =
+  global_var["catch"] = true
+
+test "watch pragma with no args":
+  global_var["catch"] = false
+  # Inject the custom to trigger before they actual proc, but "catch" stays true because the main proc doesn't run
+  inj_actions.where = before
+  inj_actions.pass_args = false
+  inj_actions.run_proc = false
+  inj_actions.active = true
+  set_inj("catch_in", catch_basic)
+  catch_in()
+  check global_var["catch"]
+  inj_actions.run_proc = true
+  catch_in()
+  check not global_var["catch"]
+
+
+proc args_watched(val: bool) {.watch.} =
+  discard not val
+
+proc args_sent(vals: varargs[pointer]) =
+  let given = cast[ptr bool](vals[0])[]
+  if given:
+    global_var["catch args"] = true
+
+test "watch pragma with args":
+  global_var["catch args"] = false
+  inj_actions.where = after
+  inj_actions.pass_args = true
+  inj_actions.run_proc = true
+  inj_actions.active = false
+  args_watched(true)
+  check not global_var["catch args"]
+  set_inj("args_watched", args_sent)
+  args_watched(true)
+  check not global_var["catch args"]
+  inj_actions.active = true
+  args_watched(true)
+  check global_var["catch args"]
+
+  
+
