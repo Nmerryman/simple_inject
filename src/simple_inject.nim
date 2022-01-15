@@ -83,15 +83,10 @@ macro inj_with_args*(x: typed): untyped =
         result[6][^appended][^1][^1][^1][a] = newTree(nnkCall, bindsym("pointer"), result[6][^appended][^1][^1][^1][a])
 
 
-template gen_inj_block(container: inj_actions_container, loc: inj_location, pass: bool): untyped =
-    when pass:
-        quote do:
-            if `container`.active and `container`.where == `loc` and `container`.pass_args and arg_str_to_proc.hasKey(`proc_name`):
-                arg_str_to_proc[`proc_name`]()
-    else:
-        quote do:
-            if `container`.active and `container`.where == `loc` and not `container`.pass_args and simple_str_to_proc.hasKey(`proc_name`):
-                simple_str_to_proc[`proc_name`]()
+template gen_inj_block(container: inj_actions_container, loc: inj_location, pass: bool, proc_trans: typed): untyped =
+    quote do:
+        if `container`.active and `container`.where == `loc` and not (`pass` xor `container`.pass_args) and `proc_trans`.hasKey(`proc_name`):
+            `proc_trans`[`proc_name`]()
 
 
 macro watch*(x: typed): typed =
@@ -100,10 +95,10 @@ macro watch*(x: typed): typed =
     let proc_name = x.name.strVal
     var meat = x[6].copy
     # prep all paths
-    var pre_inj_basic = gen_inj_block(inj_actions_default, before, false)
-    var post_inj_basic = gen_inj_block(inj_actions_default, after, false)
-    var pre_inj_arg = gen_inj_block(inj_actions_default, before, true)
-    var post_inj_arg = gen_inj_block(inj_actions_default, after, true)
+    var pre_inj_basic = gen_inj_block(inj_actions_default, before, false, simple_str_to_proc)
+    var post_inj_basic = gen_inj_block(inj_actions_default, after, false, simple_str_to_proc)
+    var pre_inj_arg = gen_inj_block(inj_actions_default, before, true, arg_str_to_proc)
+    var post_inj_arg = gen_inj_block(inj_actions_default, after, true, arg_str_to_proc)
     
 
     # extract, prep, and inject the parameters
