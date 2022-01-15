@@ -89,16 +89,33 @@ template gen_inj_block(container: inj_actions_container, loc: inj_location, pass
             `proc_trans`[`proc_name`]()
 
 
+template inj_block_wrapper(container: inj_actions_container, loc: inj_location, pass: bool, proc_trans: typed): untyped =
+    # Adds priority context
+
+    quote do:
+        if enabled_proc_inj_override:
+            if inj_actions_override.active and `container`.where == `loc` and not (`pass` xor `container`.pass_args) and `proc_trans`.hasKey(`proc_name`):
+                `proc_trans`[`proc_name`]()
+        elif `proc_name` in `proc_trans`:
+            if `container`.active and `container`.where == `loc` and not (`pass` xor `container`.pass_args) and `proc_trans`.hasKey(`proc_name`):
+                `proc_trans`[`proc_name`]()
+        else:
+            if inj_actions_default.active and `container`.where == `loc` and not (`pass` xor `container`.pass_args) and `proc_trans`.hasKey(`proc_name`):
+                `proc_trans`[`proc_name`]()
+
+    
+
+
 macro watch*(x: typed): typed =
     x.expectKind(nnkProcDef)
     result = x.copy
     let proc_name = x.name.strVal
     var meat = x[6].copy
     # prep all paths
-    var pre_inj_basic = gen_inj_block(inj_actions_default, before, false, simple_str_to_proc)
-    var post_inj_basic = gen_inj_block(inj_actions_default, after, false, simple_str_to_proc)
-    var pre_inj_arg = gen_inj_block(inj_actions_default, before, true, arg_str_to_proc)
-    var post_inj_arg = gen_inj_block(inj_actions_default, after, true, arg_str_to_proc)
+    var pre_inj_basic = inj_block_wrapper(inj_actions_default, before, false, simple_str_to_proc)
+    var post_inj_basic = inj_block_wrapper(inj_actions_default, after, false, simple_str_to_proc)
+    var pre_inj_arg = inj_block_wrapper(inj_actions_default, before, true, arg_str_to_proc)
+    var post_inj_arg = inj_block_wrapper(inj_actions_default, after, true, arg_str_to_proc)
     
 
     # extract, prep, and inject the parameters
@@ -111,10 +128,14 @@ macro watch*(x: typed): typed =
     for a in parameters:
         preped_params.add(newCall("pointer", newCall("unsafeaddr", a)))
     
-
+    # echo pre_inj_arg.treeRepr
     for a in preped_params:
-        pre_inj_arg[0][1][0].add(a)
-        post_inj_arg[0][1][0].add(a)
+        pre_inj_arg[0][1][0][0][1][0].add(a)
+        pre_inj_arg[1][1][0][0][1][0].add(a)
+        pre_inj_arg[2][0][0][0][1][0].add(a)
+        post_inj_arg[0][1][0][0][1][0].add(a)
+        post_inj_arg[1][1][0][0][1][0].add(a)
+        post_inj_arg[2][0][0][0][1][0].add(a)
     
 
     # prep the meat
@@ -133,7 +154,7 @@ macro watch*(x: typed): typed =
 
     result[6] = wraped_meat
     
-    # echo wraped_meat.treeRepr
+    # echo result.toStrLit
 
 
 macro call_normal*(x: untyped): untyped =

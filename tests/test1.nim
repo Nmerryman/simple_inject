@@ -1,4 +1,5 @@
 # Each test should test default, a modification without activation, and then activation
+# TODO slit tests up more to give more info on failures
 
 import unittest, tables
 import simple_inject
@@ -6,6 +7,7 @@ import simple_inject
 
 var global_var* = initTable[string, bool]()
 enabled_proc_inj_override = true
+inj_actions_override.active = true
 
 
 proc simple_change_global =
@@ -61,38 +63,44 @@ proc catch_basic =
 test "watch pragma with no args":
   global_var["catch"] = false
   # Inject the custom to trigger before they actual proc, but "catch" stays true because the main proc doesn't run
-  inj_actions_default.where = before
-  inj_actions_default.pass_args = false
-  inj_actions_default.run_proc = false
-  inj_actions_default.active = true
+  # inj_actions_default.where = before
+  # inj_actions_default.pass_args = false
+  # inj_actions_default.run_proc = false
+  # inj_actions_default.active = true
+  inj_actions_override.where = before
+  inj_actions_override.pass_args = false
+  inj_actions_override.run_proc = false
+  inj_actions_override.active = true
+  # enabled_proc_inj_override = true
   set_inj("catch_in", catch_basic)
   catch_in()
   check global_var["catch"]
-  inj_actions_default.run_proc = true
+  # inj_actions_default.run_proc = true
+  enabled_proc_inj_override = true
   catch_in()
   check not global_var["catch"]
 
 
 proc args_watched(val: bool) {.watch.} =
+  echo "watch"
   discard not val
 
 proc args_sent(vals: varargs[pointer]) =
+  echo "hit"
   let given = cast[ptr bool](vals[0])[]
   if given:
     global_var["catch args"] = true
 
 test "watch pragma with args":
   global_var["catch args"] = false
-  inj_actions_default.where = after
-  inj_actions_default.pass_args = true
-  inj_actions_default.run_proc = true
-  inj_actions_default.active = false
+  enabled_proc_inj_override = false
+  inj_actions_override.pass_args = true
   args_watched(true)
   check not global_var["catch args"]
   set_inj("args_watched", args_sent)
   args_watched(true)
   check not global_var["catch args"]
-  inj_actions_default.active = true
+  enabled_proc_inj_override = true
   args_watched(true)
   check global_var["catch args"]
 
