@@ -1,18 +1,21 @@
 import  std/macros, std/tables
 export tables
 
-var simple_str_to_proc* = initTable[string, proc ()]()
-var arg_str_to_proc* = initTable[string, proc(T: varargs[pointer])]()
-var enabled_proc_inj* = true  # TODO global rn, want to make it proc specific later
 type inj_location* = enum
     before, after
-type inj_actions_container* = ref object
+type inj_actions_container* = object
     where*: inj_location
     pass_args*: bool
     run_proc*: bool
     active*: bool
 
-var inj_actions* = new inj_actions_container
+var simple_str_to_proc* = initTable[string, proc ()]()
+var arg_str_to_proc* = initTable[string, proc(T: varargs[pointer])]()
+var custom_inj_actions* = initTable[string, inj_actions_container]()
+var inj_actions_default* = inj_actions_container(active: true)
+var inj_actions_override* = inj_actions_container()
+var enabled_proc_inj_override* = false  # TODO global rn, want to make it proc specific later
+
 
 # type wargs
 
@@ -27,7 +30,7 @@ macro inj*(x: typed): typed =
     var modify = x[^1].copy
     let operation = block:  # Node I want to inject
         quote do:
-            if simple_str_to_proc.hasKey(`proc_name`) and enabled_proc_inj:
+            if simple_str_to_proc.hasKey(`proc_name`) and enabled_proc_inj_override:
                 let runable = simple_str_to_proc[`proc_name`]
                 runable()
     
@@ -48,7 +51,7 @@ macro inj_with_args*(x: typed): untyped =
     var modify = x[6].copy
     let operation = block:  # Node I want to inject
         quote do:
-            if arg_str_to_proc.hasKey(`proc_name`) and enabled_proc_inj:
+            if arg_str_to_proc.hasKey(`proc_name`) and enabled_proc_inj_override:
                 discard
                 arg_str_to_proc[`proc_name`]()  # the modify is temporary to avoid an issue
     var appended = 1  # Because sometimes more things get appended to the end (such as result)
@@ -80,28 +83,27 @@ macro inj_with_args*(x: typed): untyped =
         result[6][^appended][^1][^1][^1][a] = newTree(nnkCall, bindsym("pointer"), result[6][^appended][^1][^1][^1][a])
 
 
+template gen_inj_block(container: inj_actions_container, loc: inj_location, pass: bool): untyped =
+    when pass:
+        quote do:
+            if `container`.active and `container`.where == `loc` and `container`.pass_args and arg_str_to_proc.hasKey(`proc_name`):
+                arg_str_to_proc[`proc_name`]()
+    else:
+        quote do:
+            if `container`.active and `container`.where == `loc` and not `container`.pass_args and simple_str_to_proc.hasKey(`proc_name`):
+                simple_str_to_proc[`proc_name`]()
+
+
 macro watch*(x: typed): typed =
     x.expectKind(nnkProcDef)
     result = x.copy
     let proc_name = x.name.strVal
     var meat = x[6].copy
     # prep all paths
-    var pre_inj_basic = block:
-        quote do:
-            if inj_actions.active and inj_actions.where == before and not inj_actions.pass_args and simple_str_to_proc.hasKey(`proc_name`):
-                simple_str_to_proc[`proc_name`]() 
-    var post_inj_basic = block:
-        quote do:
-            if inj_actions.active and inj_actions.where == after and not inj_actions.pass_args and simple_str_to_proc.hasKey(`proc_name`):
-                simple_str_to_proc[`proc_name`]() 
-    var pre_inj_arg = block:
-        quote do:
-            if inj_actions.active and inj_actions.where == before and inj_actions.pass_args and arg_str_to_proc.hasKey(`proc_name`):
-                arg_str_to_proc[`proc_name`]() 
-    var post_inj_arg = block:
-        quote do:
-            if inj_actions.active and inj_actions.where == after and inj_actions.pass_args and arg_str_to_proc.hasKey(`proc_name`):
-                arg_str_to_proc[`proc_name`]() 
+    var pre_inj_basic = gen_inj_block(inj_actions_default, before, false)
+    var post_inj_basic = gen_inj_block(inj_actions_default, after, false)
+    var pre_inj_arg = gen_inj_block(inj_actions_default, before, true)
+    var post_inj_arg = gen_inj_block(inj_actions_default, after, true)
     
 
     # extract, prep, and inject the parameters
@@ -126,7 +128,7 @@ macro watch*(x: typed): typed =
     
     # add run check to meat
     let active_check = quote do:
-        inj_actions.run_proc
+        inj_actions_default.run_proc
     var wraped_meat = newStmtList(newIfStmt((active_check, meat)))
 
     # insert the injections
@@ -141,9 +143,9 @@ macro watch*(x: typed): typed =
 
 macro call_normal*(x: untyped): untyped =
     quote do:
-        enabled_proc_inj = false
+        enabled_proc_inj_override = false
         `x`
-        enabled_proc_inj = true
+        enabled_proc_inj_override = true
 
 
 

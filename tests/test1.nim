@@ -1,15 +1,11 @@
-# This is just an example to get you started. You may wish to put all of your
-# tests into a single file, or separate them into multiple `test1`, `test2`
-# etc. files (better names are recommended, just make sure the name starts with
-# the letter 't').
-#
-# To run these tests, simply execute `nimble test`.
+# Each test should test default, a modification without activation, and then activation
 
 import unittest, tables
 import simple_inject
 
 
 var global_var* = initTable[string, bool]()
+enabled_proc_inj_override = true
 
 
 proc simple_change_global =
@@ -65,14 +61,14 @@ proc catch_basic =
 test "watch pragma with no args":
   global_var["catch"] = false
   # Inject the custom to trigger before they actual proc, but "catch" stays true because the main proc doesn't run
-  inj_actions.where = before
-  inj_actions.pass_args = false
-  inj_actions.run_proc = false
-  inj_actions.active = true
+  inj_actions_default.where = before
+  inj_actions_default.pass_args = false
+  inj_actions_default.run_proc = false
+  inj_actions_default.active = true
   set_inj("catch_in", catch_basic)
   catch_in()
   check global_var["catch"]
-  inj_actions.run_proc = true
+  inj_actions_default.run_proc = true
   catch_in()
   check not global_var["catch"]
 
@@ -87,16 +83,16 @@ proc args_sent(vals: varargs[pointer]) =
 
 test "watch pragma with args":
   global_var["catch args"] = false
-  inj_actions.where = after
-  inj_actions.pass_args = true
-  inj_actions.run_proc = true
-  inj_actions.active = false
+  inj_actions_default.where = after
+  inj_actions_default.pass_args = true
+  inj_actions_default.run_proc = true
+  inj_actions_default.active = false
   args_watched(true)
   check not global_var["catch args"]
   set_inj("args_watched", args_sent)
   args_watched(true)
   check not global_var["catch args"]
-  inj_actions.active = true
+  inj_actions_default.active = true
   args_watched(true)
   check global_var["catch args"]
 
