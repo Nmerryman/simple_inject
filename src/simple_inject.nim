@@ -17,7 +17,7 @@ var inj_actions_override* = inj_actions_container()
 var enabled_proc_inj_override* = false  # TODO global rn, want to make it proc specific later
 
 
-# type wargs
+# TODO wargs
 
 
 ## I want to add a pre and middle option and varying levels of complexity
@@ -97,19 +97,12 @@ template inj_block_wrapper(container: Table[string, inj_actions_container], loc:
         if enabled_proc_inj_override:
             if inj_actions_override.active and inj_actions_override.where == `loc` and not (`pass` xor inj_actions_override.pass_args) and `proc_trans`.hasKey(`proc_name`):
                 `proc_trans`[`proc_name`]()
-            # echo "over hit: ", inj_actions_override.active, inj_actions_override.where == `loc`, not (`pass` xor inj_actions_override.pass_args), `proc_trans`.hasKey(`proc_name`)
         elif `proc_name` in `container`:
             if `container`.hasKey(`proc_name`) and `container`[`proc_name`].active and `container`[`proc_name`].where == `loc` and not (`pass` xor `container`[`proc_name`].pass_args) and `proc_trans`.hasKey(`proc_name`):
                 `proc_trans`[`proc_name`]()
-            # echo "set try: ",`container`.hasKey(`proc_name`) 
-            # if `container`.hasKey(`proc_name`):
-            #     echo "set hit: ", `container`.hasKey(`proc_name`), `container`[`proc_name`].active, `container`[`proc_name`].where == `loc`, not (`pass` xor `container`[`proc_name`].pass_args), `proc_trans`.hasKey(`proc_name`) 
         else:
             if inj_actions_default.active and inj_actions_default.where == `loc` and not (`pass` xor inj_actions_default.pass_args) and `proc_trans`.hasKey(`proc_name`):
                 `proc_trans`[`proc_name`]()
-                # echo "default hit"
-            # echo "else hit: ", inj_actions_default.active, inj_actions_default.where == `loc`, not (`pass` xor inj_actions_default.pass_args), `proc_trans`.hasKey(`proc_name`)
-        # echo `testing`
 
 
 macro watch*(x: typed): typed =
@@ -135,7 +128,6 @@ macro watch*(x: typed): typed =
     for a in parameters:
         preped_params.add(newCall("pointer", newCall("unsafeaddr", a)))
     
-    # echo pre_inj_arg.treeRepr
     for a in preped_params:
         pre_inj_arg[0][1][0][0][1][0].add(a)
         pre_inj_arg[1][1][0][0][1][0].add(a)
@@ -148,38 +140,28 @@ macro watch*(x: typed): typed =
     # prep the meat
     if meat.kind != nnkStmtList:
         meat = newStmtList(meat.copy)
-    # var thing = quote do:
-    #     discard
-    # meat = newStmtList(thing)
     
     # add run check to meat
     let active_check = quote do:
         if (simple_str_to_proc.hasKey(`proc_name`) or arg_str_to_proc.hasKey(`proc_name`)):
             if enabled_proc_inj_override:
-                echo "running override: ", inj_actions_override.run_proc
                 inj_actions_override.run_proc
             elif custom_inj_actions.hasKey(`proc_name`):
                 custom_inj_actions[`proc_name`].run_proc
             else:
                 inj_actions_default.run_proc
         else:
-            echo "true hit"
             true
             
-    let extra = quote do:
-        echo "try run main"
-    var wraped_meat = newStmtList(newIfStmt((active_check, meat)), extra)
-    echo wraped_meat.repr
+    var wraped_meat = newStmtList(newIfStmt((active_check, meat)))
 
     # insert the injections
     wraped_meat.insert(0, pre_inj_arg)
     wraped_meat.insert(1, pre_inj_basic)
     wraped_meat.add(post_inj_arg, post_inj_basic)
-    # echo wraped_meat.treeRepr
+    
     result[6] = wraped_meat
     
-    # echo result.toStrLit
-
 
 macro call_normal*(x: untyped): untyped =
     quote do:

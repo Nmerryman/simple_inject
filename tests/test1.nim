@@ -55,7 +55,6 @@ test "passing basic args works properly":
 
 proc catch_in {.watch.} =
   # This will only run when run main is called
-  echo "caught running"
   global_var["catch"] = false
 
 proc catch_basic =
@@ -83,11 +82,9 @@ test "watch pragma with no args":
 
 
 proc args_watched(val: bool) {.watch.} =
-  echo "watch"
   discard not val
 
 proc args_sent(vals: varargs[pointer]) =
-  echo "hit"
   let given = cast[ptr bool](vals[0])[]
   if given:
     global_var["catch args"] = true
