@@ -89,21 +89,27 @@ template gen_inj_block(container: inj_actions_container, loc: inj_location, pass
             `proc_trans`[`proc_name`]()
 
 
-template inj_block_wrapper(container: inj_actions_container, loc: inj_location, pass: bool, proc_trans: typed): untyped =
+template inj_block_wrapper(container: Table[string, inj_actions_container], loc: inj_location, pass: bool, proc_trans: typed, testing: string): untyped =
     # Adds priority context
-
+    # TODO consider changing this to a proc
+    # FIXME properly propigate inj_actions_override, inj_actions_default calls, correctly add custom_inj_actions and prob fix injecting the preped args again
     quote do:
         if enabled_proc_inj_override:
-            if inj_actions_override.active and `container`.where == `loc` and not (`pass` xor `container`.pass_args) and `proc_trans`.hasKey(`proc_name`):
+            if inj_actions_override.active and inj_actions_override.where == `loc` and not (`pass` xor inj_actions_override.pass_args) and `proc_trans`.hasKey(`proc_name`):
                 `proc_trans`[`proc_name`]()
-        elif `proc_name` in `proc_trans`:
-            if `container`.active and `container`.where == `loc` and not (`pass` xor `container`.pass_args) and `proc_trans`.hasKey(`proc_name`):
+            # echo "over hit: ", inj_actions_override.active, inj_actions_override.where == `loc`, not (`pass` xor inj_actions_override.pass_args), `proc_trans`.hasKey(`proc_name`)
+        elif `proc_name` in `container`:
+            if `container`.hasKey(`proc_name`) and `container`[`proc_name`].active and `container`[`proc_name`].where == `loc` and not (`pass` xor `container`[`proc_name`].pass_args) and `proc_trans`.hasKey(`proc_name`):
                 `proc_trans`[`proc_name`]()
+            # echo "set try: ",`container`.hasKey(`proc_name`) 
+            # if `container`.hasKey(`proc_name`):
+            #     echo "set hit: ", `container`.hasKey(`proc_name`), `container`[`proc_name`].active, `container`[`proc_name`].where == `loc`, not (`pass` xor `container`[`proc_name`].pass_args), `proc_trans`.hasKey(`proc_name`) 
         else:
-            if inj_actions_default.active and `container`.where == `loc` and not (`pass` xor `container`.pass_args) and `proc_trans`.hasKey(`proc_name`):
+            if inj_actions_default.active and inj_actions_default.where == `loc` and not (`pass` xor inj_actions_default.pass_args) and `proc_trans`.hasKey(`proc_name`):
                 `proc_trans`[`proc_name`]()
-
-    
+                # echo "default hit"
+            # echo "else hit: ", inj_actions_default.active, inj_actions_default.where == `loc`, not (`pass` xor inj_actions_default.pass_args), `proc_trans`.hasKey(`proc_name`)
+        # echo `testing`
 
 
 macro watch*(x: typed): typed =
@@ -112,10 +118,11 @@ macro watch*(x: typed): typed =
     let proc_name = x.name.strVal
     var meat = x[6].copy
     # prep all paths
-    var pre_inj_basic = inj_block_wrapper(inj_actions_default, before, false, simple_str_to_proc)
-    var post_inj_basic = inj_block_wrapper(inj_actions_default, after, false, simple_str_to_proc)
-    var pre_inj_arg = inj_block_wrapper(inj_actions_default, before, true, arg_str_to_proc)
-    var post_inj_arg = inj_block_wrapper(inj_actions_default, after, true, arg_str_to_proc)
+    # TODO remove the debug strings here
+    var pre_inj_basic = inj_block_wrapper(custom_inj_actions, before, false, simple_str_to_proc, "pre_basic")
+    var post_inj_basic = inj_block_wrapper(custom_inj_actions, after, false, simple_str_to_proc, "post_basic")
+    var pre_inj_arg = inj_block_wrapper(custom_inj_actions, before, true, arg_str_to_proc, "pre_arg")
+    var post_inj_arg = inj_block_wrapper(custom_inj_actions, after, true, arg_str_to_proc, "post_arg")
     
 
     # extract, prep, and inject the parameters
@@ -141,17 +148,34 @@ macro watch*(x: typed): typed =
     # prep the meat
     if meat.kind != nnkStmtList:
         meat = newStmtList(meat.copy)
+    # var thing = quote do:
+    #     discard
+    # meat = newStmtList(thing)
     
     # add run check to meat
     let active_check = quote do:
-        inj_actions_default.run_proc
-    var wraped_meat = newStmtList(newIfStmt((active_check, meat)))
+        if (simple_str_to_proc.hasKey(`proc_name`) or arg_str_to_proc.hasKey(`proc_name`)):
+            if enabled_proc_inj_override:
+                echo "running override: ", inj_actions_override.run_proc
+                inj_actions_override.run_proc
+            elif custom_inj_actions.hasKey(`proc_name`):
+                custom_inj_actions[`proc_name`].run_proc
+            else:
+                inj_actions_default.run_proc
+        else:
+            echo "true hit"
+            true
+            
+    let extra = quote do:
+        echo "try run main"
+    var wraped_meat = newStmtList(newIfStmt((active_check, meat)), extra)
+    echo wraped_meat.repr
 
     # insert the injections
-    wraped_meat.insert(0, pre_inj_basic)
-    wraped_meat.insert(1, pre_inj_arg)
-    wraped_meat.add(post_inj_basic, post_inj_arg)
-
+    wraped_meat.insert(0, pre_inj_arg)
+    wraped_meat.insert(1, pre_inj_basic)
+    wraped_meat.add(post_inj_arg, post_inj_basic)
+    # echo wraped_meat.treeRepr
     result[6] = wraped_meat
     
     # echo result.toStrLit
