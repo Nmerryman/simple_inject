@@ -4,3 +4,4 @@ tests/devmain.nim
 tests/test1.exe
 tests/deep.nim
 nimbledeps
+README.txt
