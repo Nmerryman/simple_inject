@@ -1,56 +1,12 @@
 # Each test should test default, a modification without activation, and then activation
-# TODO slit tests up more to give more info on failures
 
-import unittest, tables, sequtils
+import unittest, tables
 import simple_inject
 
 
 var global_var* = initTable[string, bool]()
 enabled_proc_inj_override = true
 inj_actions_override.active = true
-
-
-proc simple_change_global =
-  global_var["simple"] = true
-
-proc simple_main {.inj.} =
-  discard 1 + 1
-
-test "simple version works properly":
-  global_var["simple"] = false
-  check not global_var["simple"]  # value starts correctly
-  simple_main()
-  check not global_var["simple"]  # Nothing changes when it's not meant to
-  set_inj("simple_main", simple_change_global)  # proc to check for in string, proc to call
-  check not global_var["simple"]  # Change instructions, but don't modify anything
-  simple_main()
-  check global_var["simple"]  # Global changes now after detecting to add call
-
-
-proc arg_change_global(args: varargs[pointer]) =
-  if cast[ptr bool](args[0])[]:  # knowing what data type the first pointer is supposed to be
-    global_var["arg"] = true
-
-proc arg_main(do_change: bool = false) {.inj_with_args.} =
-  discard not do_change
-
-test "passing basic args works properly":
-  global_var["arg"] = false
-  check not global_var["arg"]  # value starts correctly
-  arg_main(true)
-  check not global_var["arg"]  # Nothing changes when it's not meant to
-  set_inj("arg_main", arg_change_global)  # proc to check for in string, proc to call
-  check not global_var["arg"]  # Change instructions, but don't modify anything
-  arg_main(true)
-  check global_var["arg"]  # Global changes now after detecting to add call
-
-  global_var["arg"] = false  # test disabler
-  check not global_var["arg"]
-  call_normal:  # doesn't do any injections
-    arg_main(true)
-  check not global_var["arg"]
-  arg_main(true)
-  check global_var["arg"]
 
 
 proc catch_in {.watch.} =
@@ -159,7 +115,7 @@ test "watch with defaults, args":
   to_watch_args(0, true)
   check "args" in global_var  # verify connection
   check global_var["args"]  # correct data is passed
-  
+
 
 test "watch with override, no args":
   reset_all()
@@ -185,3 +141,56 @@ test "watch with override, args":
   to_watch_args(0, true)
   check "args" in global_var  # verify connection
   check global_var["args"]  # correct data is passed
+
+
+reset_all()
+
+proc mod_false {.watch.} =
+  global_var["mod"] = false
+
+proc mod_true {.watch.} =
+  global_var["mod"] = true
+
+test "manual custom":
+  global_var["mod"] = false  # baseline
+  mod_true()
+  check global_var["mod"]  # true works
+  mod_false()
+  check not global_var["mod"]  # false works
+
+  # setup default settings
+  set_inj("mod_false", mod_true)
+  inj_actions_default.where = after
+  inj_actions_default.pass_args = false
+  inj_actions_default.run_proc = true
+  inj_actions_default.active = true
+
+  mod_false()
+  check global_var["mod"]  # hook works by running true after
+
+  inj_actions_default.where = before
+  mod_false()
+  check not global_var["mod"]  # no change when still hooked because true runs before
+
+  custom_inj_actions["mod_false"] = inj_actions_container(where: after, run_proc: true, active: true)
+  mod_false()
+  check global_var["mod"]  # false gets a custom/non default hook to run true after
+
+  custom_inj_actions.del("mod_false")
+  mod_false()
+  check not global_var["mod"]  # back to normal
+
+
+test "temp_custom template":
+  # Assuming past test settings are the same (true runs before)
+  mod_false()
+  check not global_var["mod"]
+
+  temp_custom "mod_false", inj_actions_container(where: after, run_proc: true, active: true):
+    mod_false()
+  check global_var["mod"]
+
+  mod_false()
+  check not global_var["mod"]
+
+
